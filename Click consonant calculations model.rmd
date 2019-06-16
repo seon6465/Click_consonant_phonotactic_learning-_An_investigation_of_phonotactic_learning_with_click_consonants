@@ -1,0 +1,302 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Data
+```{r}
+library(readr)
+library(psych)
+library(dplyr)
+click_data <- read_csv("click_data.csv")
+```
+
+## Clean up some data
+```{r}
+click_data$list <- as.factor(click_data$list)
+click_data$subj_num <- as.factor(click_data$subj_num)
+
+click_data[click_data=="#N/A"] <- NA
+```
+
+## Split the data into groups
+```{r}
+clicks <- split(click_data, click_data$subj_num)
+```
+
+## Run calculations against each group
+```{r}
+results <- data.frame(subject = integer(), listing = character(), consLegalErrors = integer(), consIllegalErrors = integer(), clicksLegalErrors = integer(), clicksIllegalErrors = integer(), restrictedConsonantSlipsLegal = integer(), restrictedConsonantSlipsIllegal = integer(), unrestrictedConsonantSlipsLegal = integer(), unrestrictedConsonantSlipsIllegal = integer(), restrictedClickSlipsLegal = integer(), restrictedClickSlipsIllegal = integer(), unrestrictedClickSlipsLegal = integer(), unrestrictedClickSlipsIllegal = integer(), consToCons = integer(), consToClick = integer(), clickToCons = integer(), clickToClick = integer(), phiValue = numeric(), stringsAsFactors=FALSE)
+clickVals <- c("!", "|")
+for (cnst in clicks) {
+  numConsLegal <- 0
+  numConsIllegal <- 0
+  numClickLegal <- 0
+  numClickIllegal <- 0
+  restrictedConsSlipLegal <- 0
+  restrictedConsSlipIllegal <- 0
+  unrestrictConsSlipLegal <- 0
+  unrestrictConsSlipIllegal <- 0
+  
+  restrictedClickSlipLegal <- 0
+  restrictedClickSlipIllegal <- 0
+  unrestrictClickSlipLegal <- 0
+  unrestrictClickSlipIllegal <- 0
+  
+  consToCons <- 0
+  consToClick <- 0
+  clickToCons <- 0
+  clickToClick <- 0
+  
+  listing <- ""
+  for(i in 1:nrow(cnst)) {
+    # Get a single row of data
+    row <- cnst[i, ]
+    
+    # Print out some information about what we are looking at
+    if (i == 1) {
+      listing <- as.character(row$list)
+      print(paste("Results for ", as.integer(row$subj_num)))
+      print(paste("With listing ", listing))
+    }
+    
+    # There is a slip
+    if (!is.na(row$slip)) {
+      # It is a click
+      if (row$slip %in% clickVals) {
+        # There is a legal computation for it
+        if (!is.na(row$legal)) {
+          # It is a legal click error
+          if (row$legal == 1) {
+            numClickLegal <- numClickLegal + 1
+          } else {
+          # It is an illegal click error
+            numClickIllegal <- numClickIllegal + 1
+          }
+        }
+      # It is not a click (consonant)
+      } else {
+        # There is a legal computation for it
+        if (!is.na(row$legal)) {
+          # It is a legal consonant error
+          if (row$legal == 1) {
+            numConsLegal <- numConsLegal + 1
+          } else {
+          # It is an illegal consonant error
+            numConsIllegal <- numConsIllegal + 1  
+          }
+        }
+      }
+
+      #----------------------------------------------------------------------------------------------------------------------------------
+      
+      # Proportion of restricted consonant slips vs proportion of unrestricted consonant slips
+      if (row$slip != "-") {
+        if (row$slip %in% unlist(strsplit(listing, ""))) {
+          # Any slip here is restricted
+          if (row$slip != "!" && row$slip != "|") {
+            # Consonant slip (restricted)
+            if (!is.na(row$legal) && row$legal == 0) {
+              # Consonant slip (restricted and illegal)
+              restrictedConsSlipIllegal <- restrictedConsSlipIllegal + 1
+            } else if (!is.na(row$legal) && row$legal == 1) {
+              # Consonant slip (restricted and legal)
+              restrictedConsSlipLegal <- restrictedConsSlipLegal + 1
+            }
+          } else {
+            # Click Slip (restricted)
+            if (!is.na(row$legal) && row$legal == 0) {
+              # Click slip (restricted and illegal)
+              restrictedClickSlipIllegal <- restrictedClickSlipIllegal + 1
+            } else if (!is.na(row$legal) && row$legal == 1) {
+              # Click slip (restricted and legal)
+              restrictedClickSlipLegal <- restrictedClickSlipLegal + 1
+            }
+          }
+        } else {
+          # Any slip here is unrestricted
+          if (row$slip != "!" && row$slip != "|") {
+            # Consonant Slip (unrestricted)
+            if (!is.na(row$legal) && row$legal == 0) {
+              # Consonant slip (unrestricted and illegal)
+              unrestrictConsSlipIllegal <- unrestrictConsSlipIllegal + 1
+            } else if (!is.na(row$legal) && row$legal == 1) {
+              # Consonant slip (unrestricted and legal)
+              unrestrictConsSlipLegal <- unrestrictConsSlipLegal + 1
+            }
+          } else {
+            # Click Slip (unrestricted)
+            if (!is.na(row$legal) && row$legal == 0) {
+              # Click slip (unrestricted and illegal)
+              unrestrictClickSlipIllegal <- unrestrictClickSlipIllegal + 1
+            } else if (!is.na(row$legal) && row$legal == 1) {
+              # Click slip (unrestricted and legal)
+              unrestrictClickSlipLegal <- unrestrictClickSlipLegal + 1
+            }
+          }
+        }
+      }
+      
+      #----------------------------------------------------------------------------------------------------------------------------------
+      
+      # Seeing the type of slip
+      if (row$slip != "-") {
+        actual <- as.character(row[substr(row$index, start = 1, stop = 3)])
+        if (!(actual %in% clickVals) && !(row$slip %in% clickVals)) {
+          # Consonant to consonant
+          consToCons <- consToCons + 1
+        } else if ((actual %in% clickVals) && !(row$slip %in% clickVals)) {
+          # Click to consonant
+          clickToCons <- clickToCons + 1
+        } else if (!(actual %in% clickVals) && (row$slip %in% clickVals)) {
+          # Consonant to click
+          consToClick <- consToClick + 1
+        } else {
+          # click to click
+          clickToClick <- clickToClick + 1
+        }
+      }
+    }
+  }
+  
+  
+  print("------------------------------------------")
+  print(paste("Number consonant legal errors: ", numConsLegal))
+  print(paste("Number consonant illegal errors: ", numConsIllegal))
+  print(paste("Percent consonant Legal ", (numConsLegal/(numConsLegal+numConsIllegal)) * 100 ))
+  print(paste("Percent consonant Illegal ", (numConsIllegal/(numConsLegal+numConsIllegal)) * 100))
+  print(paste("Number click legal errors: ", numClickLegal))
+  print(paste("Number click illegal errors: ", numClickIllegal))
+  print(paste("Percent click Legal ", (numClickLegal/(numClickLegal+numClickIllegal)) * 100 ))
+  print(paste("Percent click Illegal ", (numClickIllegal/(numClickLegal+numClickIllegal)) * 100))
+  print("")
+  print(paste("Percent restricted consonant legal", (restrictedConsSlipLegal/(restrictedConsSlipLegal + restrictedConsSlipIllegal))*100))
+  print(paste("Percent restricted consonant illlegal", (restrictedConsSlipIllegal/(restrictedConsSlipLegal + restrictedConsSlipIllegal))*100))
+  print(paste("Percent unrestricted consonant legal", (unrestrictConsSlipLegal/(unrestrictConsSlipLegal + unrestrictConsSlipIllegal))*100))
+  print(paste("Percent unrestricted consonant illegal", (unrestrictConsSlipIllegal/(unrestrictConsSlipLegal + unrestrictConsSlipIllegal))*100))
+  
+  print(paste("Percent restricted click legal", (restrictedClickSlipLegal/(restrictedClickSlipLegal + restrictedClickSlipIllegal))*100))
+  print(paste("Percent restricted click illlegal", (restrictedClickSlipIllegal/(restrictedClickSlipLegal + restrictedClickSlipIllegal))*100))
+  print(paste("Percent unrestricted click legal", (unrestrictClickSlipLegal/(unrestrictClickSlipLegal + unrestrictClickSlipIllegal))*100))
+  print(paste("Percent unrestricted click illegal", (unrestrictClickSlipIllegal/(unrestrictClickSlipLegal + unrestrictClickSlipIllegal))*100))
+  print("")
+  
+  
+  phiData <- matrix(c(consToCons, clickToCons, consToClick, clickToClick), ncol=2)
+  rownames(phiData) <- c('consonant target', 'click target')
+  colnames(phiData) <- c('consonant slip', 'click slip')
+  phiVal <- phi(phiData, digits = 5)
+  print(phiData)
+  print(paste("Phi value: ", phiVal))
+  results[nrow(results) + 1, ] <- list(as.integer(row$subj_num), listing, numConsLegal, numConsIllegal, numClickLegal, numClickIllegal, restrictedConsSlipLegal, restrictedConsSlipIllegal, unrestrictConsSlipLegal, unrestrictConsSlipIllegal, restrictedClickSlipLegal, restrictedClickSlipIllegal, unrestrictClickSlipLegal, unrestrictClickSlipIllegal, consToCons, clickToCons, consToClick, clickToClick, phiVal)
+  
+  print("==========================================")
+  print("")
+}
+
+print("")
+print("")
+print("")
+
+totalConsLegal <- sum(results$consLegalErrors)
+totalConsIllegal <- sum(results$consIllegalErrors)
+totalConsError <- totalConsLegal + totalConsIllegal
+totalClicksLegal <- sum(results$clicksLegalErrors)
+totalClicksIllegal <- sum(results$clicksIllegalErrors)
+totalClicksError <- totalClicksLegal+ totalClicksIllegal
+phiDataTotal <- matrix(c(sum(results$consToCons), sum(results$clickToCons), sum(results$consToClick), sum(results$clickToClick)), ncol=2)
+rownames(phiDataTotal) <- c('consonant target', 'click target')
+colnames(phiDataTotal) <- c('consonant slip', 'click slip')
+totalPhi <- phi(phiDataTotal, digits = 5)
+
+print(paste("Total percent of consonant legal errors: ", (totalConsLegal/totalConsError)*100))
+print(paste("Total percent of consonant illegal errors: ", (totalConsIllegal/totalConsError)*100))
+print(paste("Total percent of clicks legal errors: ", (totalClicksLegal/totalClicksError)*100))
+print(paste("Total percent of clicks illegal errors: ", (totalClicksIllegal/totalClicksError)*100))
+print(phiDataTotal)
+print(paste("Phi values for all subjects: ", totalPhi))
+
+```
+
+```{r}
+percentsLegality <- data.frame(subject = integer(),
+                       
+                       percentRestrictConsonantLegal = numeric(),
+                       percentRestrictConsonantIllegal = numeric(),
+                       percentUnrestrictConsonantLegal = numeric(),
+                       percentUnrestrictConsonantIllegal = numeric(),
+                       
+                       percentRestrictClickLegal = numeric(),
+                       percentRestrictClickIllegal = numeric(),
+                       percentUnrestrictClickLegal = numeric(),
+                       percentUnrestrictClickIllegal = numeric())
+for(i in 1:nrow(results)) {
+  row <- results[i, ]
+  percentsLegality[i, ] <- c(row$subject,
+                     (row$restrictedConsonantSlipsLegal/(row$restrictedConsonantSlipsLegal+row$restrictedConsonantSlipsIllegal)),
+                     (row$restrictedConsonantSlipsIllegal/(row$restrictedConsonantSlipsLegal+row$restrictedConsonantSlipsIllegal)),
+                     (row$unrestrictedConsonantSlipsLegal/(row$unrestrictedConsonantSlipsIllegal+row$unrestrictedConsonantSlipsLegal)),
+                     (row$unrestrictedConsonantSlipsIllegal/(row$unrestrictedConsonantSlipsIllegal+row$unrestrictedConsonantSlipsLegal)),
+                     
+                     (row$restrictedClickSlipsLegal/(row$restrictedClickSlipsLegal+row$restrictedClickSlipsIllegal)),
+                     (row$restrictedClickSlipsIllegal/(row$restrictedClickSlipsLegal+row$restrictedClickSlipsIllegal)),
+                     (row$unrestrictedClickSlipsLegal/(row$unrestrictedClickSlipsLegal + row$unrestrictedClickSlipsIllegal)),
+                     (row$unrestrictedClickSlipsIllegal/(row$unrestrictedClickSlipsLegal + row$unrestrictedClickSlipsIllegal)))
+}
+
+percentsLegality
+```
+
+```{r}
+percentsNoLegality <- data.frame(subject = integer(),
+                                 percentRestrictedConsonant = numeric(),
+                                 percentUnrestrictedConsonant = numeric(),
+                                 
+                                 percentRestrictedClick = numeric(),
+                                 percentUnrestrictedClick = numeric())
+for (i in 1:nrow(results)) {
+  row <- results[i, ]
+  percentsNoLegality[i, ] <- c(row$subject,
+                               (row$restrictedConsonantSlipsLegal + row$restrictedConsonantSlipsIllegal)/(row$unrestrictedConsonantSlipsIllegal+row$unrestrictedConsonantSlipsLegal + row$restrictedConsonantSlipsLegal+row$restrictedConsonantSlipsIllegal),
+                               (row$unrestrictedConsonantSlipsLegal + row$unrestrictedConsonantSlipsIllegal)/(row$unrestrictedConsonantSlipsIllegal+row$unrestrictedConsonantSlipsLegal + row$restrictedConsonantSlipsLegal+row$restrictedConsonantSlipsIllegal),
+                               
+                               (row$restrictedClickSlipsLegal + row$restrictedClickSlipsIllegal)/(row$restrictedClickSlipsLegal+row$restrictedClickSlipsIllegal + row$unrestrictedClickSlipsLegal+row$unrestrictedClickSlipsIllegal),
+                               (row$unrestrictedClickSlipsLegal + row$unrestrictedClickSlipsIllegal)/(row$restrictedClickSlipsLegal+row$restrictedClickSlipsIllegal + row$unrestrictedClickSlipsLegal+row$unrestrictedClickSlipsIllegal)
+                               )
+}
+
+percentsNoLegality
+```
+
+```{r}
+idx <- intersect(which(!is.na(percentsLegality$percentRestrictConsonantLegal)), which(!is.na(percentsLegality$percentUnrestrictConsonantLegal)))
+t.test(results$restrictedConsonantSlipsLegal[idx], results$unrestrictedConsonantSlipsLegal[idx], paired = TRUE)
+
+wilcox.test(results$restrictedConsonantSlipsLegal[idx], results$unrestrictedConsonantSlipsLegal[idx], paired = TRUE, alternative = "two.sided")
+```
+
+```{r}
+idx <- intersect(which(!is.na(percentsLegality$percentRestrictConsonantIllegal)), which(!is.na(percentsLegality$percentUnrestrictConsonantIllegal)))
+t.test(results$restrictedConsonantSlipsIllegal[idx], results$unrestrictedConsonantSlipsIllegal[idx], paired = TRUE)
+
+wilcox.test(results$restrictedConsonantSlipsIllegal[idx], results$unrestrictedConsonantSlipsIllegal[idx], paired = TRUE, alternative = "two.sided")
+```
+
+
+```{r}
+idx <- intersect(which(!is.na(percentsLegality$percentRestrictClickLegal)), which(!is.na(percentsLegality$percentUnrestrictClickLegal)))
+t.test(results$restrictedClickSlipsLegal[idx], results$unrestrictedClickSlipsLegal[idx], paired = TRUE)
+
+wilcox.test(results$restrictedClickSlipsLegal[idx], results$unrestrictedClickSlipsLegal[idx], paired = TRUE, alternative = "two.sided")
+```
+
+```{r}
+idx <- intersect(which(!is.na(percentsLegality$percentRestrictClickIllegal)), which(!is.na(percentsLegality$percentUnrestrictClickIllegal)))
+t.test(results$restrictedClickSlipsIllegal[idx], results$unrestrictedClickSlipsIllegal[idx], paired = TRUE)
+
+wilcox.test(results$restrictedClickSlipsIllegal[idx], results$unrestrictedClickSlipsIllegal[idx], paired = TRUE, alternative = "two.sided")
+```
